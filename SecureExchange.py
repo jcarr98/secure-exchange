@@ -22,9 +22,15 @@ def performWelcome():
     return welcomeScreen.printWelcome()
 
 def runClient():
+    # Clear screen
     clear()
+
+    # Create user
     user = User()
+
+    # Loop until quit
     while True:
+        # List options for user
         print("What would you like to do?")
         print("(1) Send, (2) Refresh, (3) List Messages, (4) Read Message, (5) Quit")
         userInput = input("Enter an option number: ")
@@ -35,9 +41,11 @@ def runClient():
         except:
             print("Invalid option, please enter the number only.")
             continue
-
+        
+        #Clear screen
         clear()
 
+        # Parse user input
         if userInput == 1:
             user.send("Test message")
         elif userInput == 2:
@@ -54,6 +62,7 @@ def runClient():
 
 
 if __name__ == "__main__":
+    # Show login screen
     success = False
     while not success:
         success = performWelcome()
