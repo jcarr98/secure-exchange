@@ -22,5 +22,5 @@ database --> UserRSA(aes_key)
 database --> AES(data)
 
 # Future Plans
-Currently, I am using PyCrypto to encrypt/decrypt the data, however I'm hoping someday to write my own RSA/AES algorithm to get a better understanding of how they
+Currently, I am using pyca/cryptography to encrypt/decrypt the data, however I'm hoping someday to write my own RSA/AES algorithm to get a better understanding of how they
 work. Also for now it is only a command-line program, but maybe someday in the future I'll create a GUI for it.
