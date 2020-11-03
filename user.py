@@ -5,13 +5,21 @@ class User:
         # Spawn second thread to continuously look for updates
         self.allMessages = ["Hi Jeff from the future!", "This is from Sara"]
 
+        # Check if the program is currently doing something
+        self.busy = False
+
     def send(self, file):
+        self.busy = True
         print("Sent message %s" % file)
+        self.busy = False
 
     def receive(self):
+        self.busy = True
         print("Received 1 new message!")
+        self.busy = False
     
     def listMessages(self):
+        self.busy = True
         if len(self.allMessages) == 0:
             print("You have no messages!")
             return
@@ -21,8 +29,10 @@ class User:
             print("%i. %s" % (i+1, self.allMessages[i]))
         
         print("\n") # Add space for readability
+        self.busy = False
 
     def readMessage(self):
+        self.busy = True
         # List out messages for user to pick
         while True:
             if len(self.allMessages) == 0:
@@ -47,6 +57,8 @@ class User:
         print("Reading message %i" % messageToRead)
         print(self.allMessages[messageToRead-1])
         print("\n\n")  # Add some spacing for readability
+
+        self.busy = False
 
     def __refresh(self):
         pass
