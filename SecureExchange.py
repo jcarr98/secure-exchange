@@ -38,7 +38,7 @@ def runClient():
         # Check for valid input
         try:
             userInput = int(userInput)
-        except:
+        except ValueError:
             print("Invalid option, please enter the number only.")
             continue
         

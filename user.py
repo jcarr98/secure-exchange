@@ -45,7 +45,7 @@ class User:
 
             try:
                 messageToRead = int(messageToRead)
-            except:
+            except ValueError:
                 print("Please enter a number.")
                 continue
 

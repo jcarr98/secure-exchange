@@ -62,14 +62,17 @@ class Welcome:
         print("Generating public RSA key...")
         userPublicKey = userPrivateKey.public_key()
         print("Success! Public key created.")
-        print("Saving these keys...")
+        print("Saving your keys...")
+        
         # Create keys directory
         directory = os.getcwd()
         directory = "%s/keys" % directory
         try:
             os.mkdir(directory)
-        except:
-            print(sys.exc_info()[0])
+        except FileExistsError:
+            # Don't make the directory
+            pass
+
         # Write private key
         prvPem = userPrivateKey.private_bytes(
             encoding=serialization.Encoding.PEM,
@@ -92,7 +95,7 @@ class Welcome:
         f.write(pubPem)
         f.close()
 
-        print("Your private key has been saved. DO NOT LOSE THIS KEY. If you lose your private key you must re-register with the system and lose any messages or files sent to you.")
+        print("Your private key has been saved. DO NOT LOSE THIS KEY. If you lose your private key you must re-register with the system and lose any messages or files that have been sent to you.")
         print("Your registration is successful! You may now login.")
         print("\n")
 
