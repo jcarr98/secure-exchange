@@ -3,6 +3,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 import os
 import sys
+import json
 
 class Welcome:
     def __init__(self):
@@ -11,7 +12,7 @@ class Welcome:
     def printWelcome(self) -> bool:
         """Print the welcome text to user"""
         # Print messages
-        print("Welcome to Secure Excange, where you can send files securely to other users! Please either login or register. You can type 'quit' to quit the program.\n")
+        print("Welcome to Secure Exchange, where you can send files securely to other users! Please either login or register. You can type 'quit' to quit the program.\n")
         print("To login, use the following command: 'login <username> <password>' with no quotes and replacing <username> with your username and <password> with your password.\n")
         print("To register, use the following command: 'register <username> <password>' with no quotes and replacing <username> with your desired username and <password> with your desired password.\n")
         print("Type 'register help' to see specifc username and password requirements.\n")
@@ -38,19 +39,33 @@ class Welcome:
             sys.exit()
         else:
             print("Invalid command, try again.")
-            return False
+            outcome = False
         
-        if outcome:
-            return outcome
-        else:
-            self.printWelcome()
+        return outcome
 
     def __login(self, user, pwd) -> bool:
         """Allow users to login to the system"""
-        return False
+        ### TESTING ###
+        infoDir = "%s/test_files/%s/userInfo.json" % (os.getcwd(), user)
+        f = open(infoDir, "r")
+        userInfo = json.load(f)
+        f.close()
+
+        if userInfo["password"] == pwd:
+            print("Successful login!")
+            return True
+        else:
+            print("Bad password")
+            return False
 
     def __register(self, user, pwd) -> bool:
         """Allow users to register with the system"""
+        ### FOR TESTING ###
+        userInfo = {
+            "username": user,
+            "password": pwd,
+            "files": []
+        }
         print("Thank you for registering with the system! There are just a few more steps...")
         print("Generating private RSA key...")
         userPrivateKey = rsa.generate_private_key(
@@ -66,11 +81,29 @@ class Welcome:
 
         # Create keys directory
         ### FOR TESTING ###
-        folder = input("Please enter a folder name: ")
-        directory = os.getcwd()
-        directory = "%s/%s" % (directory, folder)
+        test = input("Save profile? y/n: ")
+        userDirectory = os.getcwd()
+        if test == "y":
+            userDirectory = "%s/test_files/%s" % (userDirectory, user)
+            keysDir = "%s/keys" % userDirectory
+            # Make user directory
+            try:
+                os.mkdir(userDirectory)
+            except FileExistsError:
+                print("Error making user directory")
+                print(sys.exc_info[0])
+        
+            # Save user info
+            #user_json = json.dumps(userInfo)
+            infoDir = "%s/userInfo.json" % userDirectory
+            f = open(infoDir, "w")
+            json.dump(userInfo, f)
+            f.close()
+        else:
+            keysDir = "%s/keys" % userDirectory
+        
         try:
-            os.mkdir(directory)
+            os.mkdir(keysDir)
         except FileExistsError:
             # Don't make the directory
             pass
@@ -81,7 +114,7 @@ class Welcome:
             format=serialization.PrivateFormat.TraditionalOpenSSL,
             encryption_algorithm=serialization.NoEncryption()
         )
-        privateDirectory = "%s/privateKey.pem" % directory
+        privateDirectory = "%s/privateKey.pem" % keysDir
         f = open(privateDirectory, "wb")
         f.write(prvPem)
         f.close()
@@ -92,7 +125,7 @@ class Welcome:
             encoding=serialization.Encoding.PEM,
             format=serialization.PublicFormat.SubjectPublicKeyInfo
         )
-        publicDirectory = "%s/publicKey.pem" % directory
+        publicDirectory = "%s/publicKey.pem" % keysDir
         f = open(publicDirectory, "wb")
         f.write(pubPem)
         f.close()
