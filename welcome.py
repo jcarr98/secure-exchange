@@ -63,10 +63,12 @@ class Welcome:
         userPublicKey = userPrivateKey.public_key()
         print("Success! Public key created.")
         print("Saving your keys...")
-        
+
         # Create keys directory
+        ### FOR TESTING ###
+        folder = input("Please enter a folder name: ")
         directory = os.getcwd()
-        directory = "%s/keys" % directory
+        directory = "%s/%s" % (directory, folder)
         try:
             os.mkdir(directory)
         except FileExistsError:
