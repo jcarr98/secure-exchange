@@ -1,15 +1,89 @@
-from pymongo import MongoClient
+from cryptography.fernet import Fernet
+import os
+import json
 
 class User:
-    def __init__(self):
-        # Spawn second thread to continuously look for updates
-        self.allMessages = ["Hi Jeff from the future!", "This is from Sara"]
+    def __init__(self, username):
+        # Load user info
+        with open(("test_files/%s/userInfo.json" % username), "r") as f:
+            self.user = json.load(f)
 
-        # Check if the program is currently doing something
+        # To check if the program is currently doing something
         self.busy = False
 
-    def send(self, file):
+    def send(self, recipient, subject, file, message=False):
         self.busy = True
+        if message:
+            fullFile = file
+            ext = "txt"
+        else:
+            # Get file contents
+            f = open(file, "r")
+            fullFile = f.read()
+            f.close()
+
+            # Get extension type
+            ext = file.split(".")[-1]
+
+        # Encode message
+        fullFile = fullFile.encode('utf-8')
+
+        # Create file name
+        initialName = subject
+        name = initialName
+        # Make sure name is unique
+        # Method: add a unique number to the end of the file
+        allFiles = os.listdir("%s/test_files/sent_files" % os.getcwd())
+        cleanFiles = []
+        # Strip extensions
+        for item in allFiles:
+            item = item.split(".")[0]
+            cleanFiles.append(item)
+
+        print(cleanFiles)
+        i = 1
+        while True:
+            if name in cleanFiles:
+                name = initialName + str(i)
+                print("Changing name to %s" % name)
+                i += 1
+            else:
+                break
+        
+        print("Saved as %s" % name)
+        # Generate key
+        key = Fernet.generate_key()
+        # Save key
+        with open(("%s/test_files/sent_files/%s.key" % (os.getcwd(), name)), "wb") as f:
+            f.write(key)
+            f.close()
+
+        # Start encrypting
+        encryptor = Fernet(key)
+        safeFile = encryptor.encrypt(fullFile)
+
+        # Save this file
+        with open(("%s/test_files/sent_files/%s.%s" % (os.getcwd(), name, ext)), "wb") as f:
+            f.write(safeFile)
+            f.close()
+
+        # Save file info
+        with open("%s/test_files/sent_files/combos.json" % os.getcwd(), "r") as f:
+            combos = json.load(f)
+            f.close()
+
+        combos[name] = {
+            "recipient": recipient,
+            "sender": self.user["username"],
+            "subject": subject,
+            "file": ("%s.%s" % (name, ext)),
+            "key": ("%s.key" % name)
+        }
+
+        with open("%s/test_files/sent_files/combos.json" % os.getcwd(), "w") as f:
+            json.dump(combos, f)
+            f.close()
+        
         print("Sent message %s" % file)
         self.busy = False
 

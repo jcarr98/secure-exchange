@@ -4,8 +4,9 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 import os
 import sys
 import json
+from user import User
 
-def welcome(self) -> bool:
+def welcome() -> bool:
         """Print the welcome text to user"""
         # Print messages
         print("Welcome to Secure Exchange, where you can send files securely to other users! Please either login or register. You can type 'quit' to quit the program.\n")
@@ -17,7 +18,7 @@ def welcome(self) -> bool:
         userAnswer = input("Please login, register, or quit to continue: ")
         return __parseWelcome(userAnswer)
 
-def __parseWelcome(self, cmd) -> bool:
+def __parseWelcome(cmd) -> bool:
     # Parse user input
     parsedCmd = cmd.split(" ")
 
@@ -39,7 +40,7 @@ def __parseWelcome(self, cmd) -> bool:
     
     return outcome
 
-def __login(self, user, pwd) -> bool:
+def __login(user, pwd) -> bool:
     """Allow users to login to the system"""
     ### TESTING ###
     infoDir = "%s/test_files/%s/userInfo.json" % (os.getcwd(), user)
@@ -49,12 +50,12 @@ def __login(self, user, pwd) -> bool:
 
     if userInfo["password"] == pwd:
         print("Successful login!")
-        return True
+        return User(userInfo["username"])
     else:
         print("Bad password")
         return False
 
-def __register(self, user, pwd) -> bool:
+def __register(user, pwd) -> bool:
     """Allow users to register with the system"""
     ### FOR TESTING ###
     userInfo = {
@@ -90,7 +91,6 @@ def __register(self, user, pwd) -> bool:
             print(sys.exc_info[0])
     
         # Save user info
-        #user_json = json.dumps(userInfo)
         infoDir = "%s/userInfo.json" % userDirectory
         f = open(infoDir, "w")
         json.dump(userInfo, f)
@@ -132,12 +132,12 @@ def __register(self, user, pwd) -> bool:
 
     return False
 
-def __admin(self) -> bool:
+def __admin() -> bool:
     """This is only for testing, it MUST be deleted after deployment"""
     print("Success! Logged in as admin")
     return True
 
-def __registerHelp(self) -> bool:
+def __registerHelp() -> bool:
     print("Username requirements: 16 characters or less.")
     print("Password requirements: 32 characters or less.")
     return False

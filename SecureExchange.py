@@ -2,7 +2,7 @@
 import sys
 from os import system, name
 # Custom imports
-from welcome import Welcome
+from welcome import welcome
 from user import User
 
 def clear():
@@ -13,20 +13,12 @@ def clear():
     else:
         _ = system('clear')
 
-def performWelcome():
-    # Clear screen
-    clear()
-
-    # Welcome users
-    welcomeScreen = Welcome()
-    return welcomeScreen.printWelcome()
-
-def runClient():
+def runClient(user):
     # Clear screen
     clear()
 
     # Create user
-    user = User()
+    # user = User()
 
     # Loop until quit
     while True:
@@ -47,7 +39,7 @@ def runClient():
 
         # Parse user input
         if userInput == 1:
-            user.send("Test message")
+            user.send("joff", "hello", "Test message", True)
         elif userInput == 2:
             user.receive()
         elif userInput == 3:
@@ -65,7 +57,9 @@ if __name__ == "__main__":
     # Show login screen
     success = False
     while not success:
-        success = performWelcome()
+        clear()
+        success = welcome()
+        print(success)
 
     # Successful login
-    runClient()
+    runClient(success)
