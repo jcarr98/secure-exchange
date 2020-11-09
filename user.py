@@ -1,4 +1,9 @@
 from cryptography.fernet import Fernet
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric import padding
 import os
 import json
 
@@ -49,13 +54,30 @@ class User:
         
         # Generate key
         key = Fernet.generate_key()
+
+        ## Encrypt key with recipient's RSA ##
+        # Get public RSA key
+        with open("%s/test_files/%s/publicKey.pem" % (os.getcwd(), recipient), "rb") as f:
+            rsa = serialization.load_pem_public_key(f.read())
+            f.close()
+
+        # Encrypt key
+        safeKey = rsa.encrypt(
+            key,
+            padding.OAEP(
+                mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                algorithm=hashes.SHA256(),
+                label=None
+            )
+        )
+
         # Save key
         with open(("%s/test_files/sent_files/%s.key" % (os.getcwd(), name)), "wb") as f:
-            f.write(key)
+            f.write(safeKey)
             f.close()
 
         # Encrypt file
-        safeFile = self.__encrypt(key)
+        safeFile = self.__encrypt(fullFile, key)
 
         # Save this file
         with open(("%s/test_files/sent_files/%s.%s" % (os.getcwd(), name, ext)), "wb") as f:

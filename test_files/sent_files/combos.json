@@ -1,1 +1,1 @@
-{"hello": {"recipient": "joff", "sender": "jeff", "subject": "hello", "file": "hello.txt", "key": "hello.key"}, "hello1": {"recipient": "joff", "sender": "joff", "subject": "hello", "file": "hello1.txt", "key": "hello1.key"}}
+{"hello1": {"recipient": "joff", "sender": "jeff", "subject": "hello", "message": true, "file": "hello1.txt", "key": "hello1.key"}}

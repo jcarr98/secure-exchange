@@ -57,12 +57,7 @@ def __login(user, pwd) -> bool:
 
 def __register(user, pwd) -> bool:
     """Allow users to register with the system"""
-    ### FOR TESTING ###
-    userInfo = {
-        "username": user,
-        "password": pwd,
-        "files": []
-    }
+
     print("Thank you for registering with the system! There are just a few more steps...")
     print("Generating private RSA key...")
     userPrivateKey = rsa.generate_private_key(
@@ -78,25 +73,25 @@ def __register(user, pwd) -> bool:
 
     # Create keys directory
     ### FOR TESTING ###
-    test = input("Save profile? y/n: ")
-    userDirectory = os.getcwd()
-    if test == "y":
-        userDirectory = "%s/test_files/%s" % (userDirectory, user)
-        keysDir = "%s/keys" % userDirectory
-        # Make user directory
-        try:
-            os.mkdir(userDirectory)
-        except FileExistsError:
-            print("Error making user directory")
-            print(sys.exc_info[0])
-    
-        # Save user info
-        infoDir = "%s/userInfo.json" % userDirectory
-        f = open(infoDir, "w")
-        json.dump(userInfo, f)
-        f.close()
-    else:
-        keysDir = "%s/keys" % userDirectory
+    userDirectory = "%s/test_files/%s" % (os.getcwd(), user)
+    keysDir = "%s/keys" % userDirectory
+    # Make user directory
+    try:
+        os.mkdir(userDirectory)
+    except FileExistsError:
+        print("Username in use")
+        print(sys.exc_info[0])
+
+    # Create user info
+    userInfo = {
+        "username": user,
+        "password": pwd
+    }
+    # Save user info
+    infoDir = "%s/userInfo.json" % userDirectory
+    f = open(infoDir, "w")
+    json.dump(userInfo, f)
+    f.close()
     
     try:
         os.mkdir(keysDir)
@@ -121,7 +116,7 @@ def __register(user, pwd) -> bool:
         encoding=serialization.Encoding.PEM,
         format=serialization.PublicFormat.SubjectPublicKeyInfo
     )
-    publicDirectory = "%s/publicKey.pem" % keysDir
+    publicDirectory = "%s/publicKey.pem" % userDirectory
     f = open(publicDirectory, "wb")
     f.write(pubPem)
     f.close()
