@@ -8,11 +8,10 @@ class User:
         with open(("test_files/%s/userInfo.json" % username), "r") as f:
             self.user = json.load(f)
 
-        # To check if the program is currently doing something
-        self.busy = False
+        self.messages = []
+
 
     def send(self, recipient, subject, file, message=False):
-        self.busy = True
         if message:
             fullFile = file
             ext = "txt"
@@ -29,7 +28,7 @@ class User:
         fullFile = fullFile.encode('utf-8')
 
         # Create file name
-        initialName = subject
+        initialName = subject.strip(".")
         name = initialName
         # Make sure name is unique
         # Method: add a unique number to the end of the file
@@ -40,17 +39,14 @@ class User:
             item = item.split(".")[0]
             cleanFiles.append(item)
 
-        print(cleanFiles)
         i = 1
         while True:
             if name in cleanFiles:
                 name = initialName + str(i)
-                print("Changing name to %s" % name)
                 i += 1
             else:
                 break
         
-        print("Saved as %s" % name)
         # Generate key
         key = Fernet.generate_key()
         # Save key
@@ -58,9 +54,8 @@ class User:
             f.write(key)
             f.close()
 
-        # Start encrypting
-        encryptor = Fernet(key)
-        safeFile = encryptor.encrypt(fullFile)
+        # Encrypt file
+        safeFile = self.__encrypt(key)
 
         # Save this file
         with open(("%s/test_files/sent_files/%s.%s" % (os.getcwd(), name, ext)), "wb") as f:
@@ -76,6 +71,7 @@ class User:
             "recipient": recipient,
             "sender": self.user["username"],
             "subject": subject,
+            "message": message,
             "file": ("%s.%s" % (name, ext)),
             "key": ("%s.key" % name)
         }
@@ -85,36 +81,53 @@ class User:
             f.close()
         
         print("Sent message %s" % file)
-        self.busy = False
+
 
     def receive(self):
-        self.busy = True
         print("Received 1 new message!")
-        self.busy = False
     
-    def listMessages(self):
-        self.busy = True
-        if len(self.allMessages) == 0:
-            print("You have no messages!")
-            return
+
+    def getMessages(self):
+        # Load items from database
+        with open("%s/test_files/sent_files/combos.json" % os.getcwd(), "r") as f:
+            databaseInfo = json.load(f)
+            f.close()
+
+        messages = []
+
+        # Get all messages available to user
+        for i in databaseInfo:
+            if databaseInfo[i]["recipient"] == self.user["username"] and databaseInfo[i]["message"]:
+                messages.append(databaseInfo[i])
+
+    def getFiles(self):
+        # Get list of all items available to user
+        with open("%s/test_files/sent_files/combos.json" % os.getcwd(), "r") as f:
+            databaseInfo = json.load(f)
+            f.close()
         
-        print("Your messages:")
-        for i in range(0, len(self.allMessages)):
-            print("%i. %s" % (i+1, self.allMessages[i]))
-        
-        print("\n") # Add space for readability
-        self.busy = False
+        files = []
+        # Download all items from database
+        for i in databaseInfo:
+            if databaseInfo[i]["recipient"] == self.user["username"] and not databaseInfo[i]["message"]:
+                files.append(databaseInfo[i])
+
+        return files
+
 
     def readMessage(self):
-        self.busy = True
+        messages = self.getMessages()
+
+        if len(messages) == 0:
+            print("No messages to read")
+            return
+
         # List out messages for user to pick
         while True:
-            if len(self.allMessages) == 0:
-                print("You have no messages to read!")
-                return
-            
             print("Pick a message to read")
-            self.listMessages()
+            for i in range(0, len(messages)):
+                print("%i. %s from %s" % (i+1, messages[i]["subject"], messages[i]["sender"]))
+
             messageToRead = input("Please enter a message number: ")
 
             try:
@@ -123,16 +136,55 @@ class User:
                 print("Please enter a number.")
                 continue
 
-            if (messageToRead <= 0) or (messageToRead > len(self.allMessages)):
+            if (messageToRead <= 0) or (messageToRead > len(messages)):
                 print("Please enter a valid message number.")
-            else: 
+            else:
                 break
         
-        print("Reading message %i" % messageToRead)
-        print(self.allMessages[messageToRead-1])
+        messageToRead = messages[messageToRead]
+
+        # Get file key
+        with open("%s/test_files/sent_files/%s" % (os.getcwd(), messageToRead["key"]), "rb") as f:
+            key = f.read()
+            f.close()
+
+        # Get message
+        with open("%s/test_files/sent_files/%s" % (os.getcwd(), messageToRead["file"]), "rb") as f:
+            file = f.read()
+            f.close()
+
+        # Decrypt message
+        message = self.__decrypt(file, key)
+
+        print(message)
+        print("\n")
+        save = input("Would you like to save this message? y/n: ")
+        
+        if save == "y":
+            print("Not implemented yet...")
+        
         print("\n\n")  # Add some spacing for readability
 
-        self.busy = False
+
+    def viewFiles(self):
+        pass
+
+
+    def __encrypt(self, file, key):
+        encryptor = Fernet(key)
+
+        return encryptor.encrypt(file)
+
+
+    def __decrypt(self, file, key):
+        decryptor = Fernet(key)
+
+        return decryptor.decrypt(file)
+
+    
+    def __save(self, location, file):
+        pass
+
 
     def __refresh(self):
         pass

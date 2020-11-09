@@ -43,7 +43,12 @@ def runClient(user):
         elif userInput == 2:
             user.receive()
         elif userInput == 3:
-            user.listMessages()
+            messages = user.getMessages()
+            if len(messages) == 0:
+                print("No messages!")
+                continue
+            for i in range(0, len(messages)):
+                print("%i. %s from %s" % (i+1, messages[i]["subject"], messages[i]["sender"]))
         elif userInput == 4:
             user.readMessage()
         elif userInput == 5:
