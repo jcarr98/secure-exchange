@@ -1,17 +1,17 @@
 # External imports
 import sys
-from os import system, name
+import os
 # Custom imports
 from welcome import welcome
 from user import User
 
 def clear():
     # Windows
-    if name == 'nt':
-        _ = system('cls')
+    if os.name == 'nt':
+        _ = os.system('cls')
     # Mac/linux
     else:
-        _ = system('clear')
+        _ = os.system('clear')
 
 def runClient(user):
     # Clear screen
@@ -39,7 +39,41 @@ def runClient(user):
 
         # Parse user input
         if userInput == 1:
-            user.send("joff", "hello", "Test message", True)
+            while True:
+                recipient = input("Who would you like to send the file to? ")
+                # Check recipient exists - BACKEND FUNCTION
+                path = "%s/test_files" % os.getcwd()
+                allFiles = os.listdir(path)
+                exists = False
+                for i in allFiles:
+                    if os.path.isdir("%s/%s" % (path, i)) and i == recipient:
+                            exists = True
+                            break
+                if exists:
+                    break
+                else:
+                    print("Please pick a valid recipient")
+            while True:
+                fileType = input("Would you like to send a message or a file? m/f: ")
+                print(fileType)
+                if fileType != "m" and fileType != "f":
+                    print("Please pick a valid option.")
+                else:
+                    break
+
+            if fileType == "m":
+                while True:
+                    subject = input("What is the subject of your message? ")
+                    if len(subject.strip(" ")) == 0:
+                        print("Please enter a valid subject")
+                    else:
+                        break
+
+                print("What message would you like to send?")
+                message = input()
+                user.send(recipient, subject, message, True)
+            else:
+                print("Work in progress")
         elif userInput == 2:
             user.receive()
         elif userInput == 3:

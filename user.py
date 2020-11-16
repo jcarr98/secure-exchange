@@ -12,6 +12,7 @@ class User:
         # Load user info
         with open(("test_files/%s/userInfo.json" % username), "r") as f:
             self.user = json.load(f)
+            f.close()
 
         self.messages = []
 
@@ -55,21 +56,8 @@ class User:
         # Generate key
         key = Fernet.generate_key()
 
-        ## Encrypt key with recipient's RSA ##
-        # Get public RSA key
-        with open("%s/test_files/%s/publicKey.pem" % (os.getcwd(), recipient), "rb") as f:
-            rsa = serialization.load_pem_public_key(f.read())
-            f.close()
-
         # Encrypt key
-        safeKey = rsa.encrypt(
-            key,
-            padding.OAEP(
-                mgf=padding.MGF1(algorithm=hashes.SHA256()),
-                algorithm=hashes.SHA256(),
-                label=None
-            )
-        )
+        safeKey = self.__encryptRSA(recipient, key)
 
         # Save key
         with open(("%s/test_files/sent_files/%s.key" % (os.getcwd(), name)), "wb") as f:
@@ -122,6 +110,8 @@ class User:
             if databaseInfo[i]["recipient"] == self.user["username"] and databaseInfo[i]["message"]:
                 messages.append(databaseInfo[i])
 
+        return messages
+
     def getFiles(self):
         # Get list of all items available to user
         with open("%s/test_files/sent_files/combos.json" % os.getcwd(), "r") as f:
@@ -153,12 +143,12 @@ class User:
             messageToRead = input("Please enter a message number: ")
 
             try:
-                messageToRead = int(messageToRead)
+                messageToRead = int(messageToRead) - 1
             except ValueError:
                 print("Please enter a number.")
                 continue
 
-            if (messageToRead <= 0) or (messageToRead > len(messages)):
+            if (messageToRead < 0) or (messageToRead >= len(messages)):
                 print("Please enter a valid message number.")
             else:
                 break
@@ -170,13 +160,28 @@ class User:
             key = f.read()
             f.close()
 
+        # Load private rsa key
+        with open("%s/test_files/%s/keys/privateKey.pem" % (os.getcwd(), self.user["username"]), "rb") as f:
+            rsa = serialization.load_pem_private_key(f.read(), password=None)
+            f.close()
+
+        # Decrypt file key
+        key = rsa.decrypt(
+            key,
+            padding.OAEP(
+                mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                algorithm=hashes.SHA256(),
+                label=None
+            )
+        )
+
         # Get message
         with open("%s/test_files/sent_files/%s" % (os.getcwd(), messageToRead["file"]), "rb") as f:
             file = f.read()
             f.close()
 
         # Decrypt message
-        message = self.__decrypt(file, key)
+        message = self.__decrypt(file, key).decode('utf-8')
 
         print(message)
         print("\n")
@@ -191,6 +196,22 @@ class User:
     def viewFiles(self):
         pass
 
+    
+    def __encryptRSA(self, user, file):
+        with open("%s/test_files/%s/publicKey.pem" % (os.getcwd(), user), "rb") as f:
+            rsa = serialization.load_pem_public_key(f.read())
+            f.close()
+
+        # Encrypt key
+        return rsa.encrypt(
+            file,
+            padding.OAEP(
+                mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                algorithm=hashes.SHA256(),
+                label=None
+            )
+        )
+        
 
     def __encrypt(self, file, key):
         encryptor = Fernet(key)
