@@ -3,6 +3,7 @@ import hashlib
 import os
 
 from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
@@ -25,7 +26,7 @@ def auth(user, pwd):
     sock = __connect()
 
     # Craft HELLO packet
-    msg = "0,0,HELLO,SecureClient,<checksum>".encode('utf-8')
+    msg = "HELLO,SecureClient".encode('utf-8')
     
     # Send packet
     sock.sendall(msg)
@@ -43,7 +44,7 @@ def auth(user, pwd):
     key = __clean_key(dirtyKey)
 
     # Craft AUTH packet
-    msg = ("1,1,AUTH,%s,%s,<checksum>" % (user, pwd)).encode('utf-8')
+    msg = ("AUTH,%s,%s" % (user, pwd)).encode('utf-8')
 
     # Encrypt packet
     msgEnc = key.encrypt(
@@ -120,7 +121,7 @@ def __clean_key(key):
 
     # Load and return key
     with open("%s/serverInfo.pem" % os.getcwd(), "rb") as f:
-        keyToReturn = serialization.load_pem_public_key(f.read())
+        keyToReturn = serialization.load_pem_public_key(f.read(), backend=default_backend())
         f.close()
 
     return keyToReturn
