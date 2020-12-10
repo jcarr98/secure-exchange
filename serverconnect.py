@@ -10,7 +10,7 @@ from cryptography.hazmat.primitives.asymmetric import padding
 
 # Methods for user to send information to server
 SERVER_IP = "127.0.0.1"
-SERVER_PORT = 8009
+SERVER_PORT = 8008
 
 def register(user, pwd, key):
     """Registers user with system
