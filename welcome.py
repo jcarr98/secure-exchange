@@ -105,7 +105,7 @@ def register(user, pwd) -> bool:
         return None, "Failed to register with the system. Please try again."
 
 def print_help() -> None:
-    print("To register, types 'register <username> <password>', replacing <username> with your desired username and <password> with your desired password.")
+    print("To register, type 'register <username> <password>', replacing <username> with your desired username and <password> with your desired password.")
     print("Username requirements: 16 characters or less.")
     print("Password requirements: 32 characters or less.")
     
