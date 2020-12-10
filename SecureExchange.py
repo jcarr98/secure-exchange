@@ -96,7 +96,7 @@ if __name__ == "__main__":
     # Show login screen
     success = False
     while not success:
-        clear()
+        #clear()
         success = welcome()
         print(success)
 

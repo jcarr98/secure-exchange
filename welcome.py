@@ -5,6 +5,7 @@ import os
 import sys
 import json
 from user import User
+import serverconnect
 
 def welcome() -> bool:
         """Print the welcome text to user"""
@@ -43,7 +44,7 @@ def __parseWelcome(cmd) -> bool:
 def __login(user, pwd) -> bool:
     """Allow users to login to the system"""
     ### TESTING ###
-    infoDir = "%s/test_files/%s/userInfo.json" % (os.getcwd(), user)
+    infoDir = "%s/local_users/%s/userInfo.json" % (os.getcwd(), user)
     f = open(infoDir, "r")
     userInfo = json.load(f)
     f.close()
@@ -56,7 +57,15 @@ def __login(user, pwd) -> bool:
         return False
 
 def __register(user, pwd) -> bool:
-    """Allow users to register with the system"""
+    """Allow users to register with the system
+
+            Parameters:
+                user (str): username
+                pwd (str): password
+
+            Returns:
+                True if registration is successful, False if not
+    """
 
     print("Thank you for registering with the system! There are just a few more steps...")
     print("Generating private RSA key...")
@@ -71,61 +80,57 @@ def __register(user, pwd) -> bool:
     print("Success! Public key created.")
     print("Saving your keys...")
 
-    # Create keys directory
-    ### FOR TESTING ###
-    userDirectory = "%s/test_files/%s" % (os.getcwd(), user)
-    keysDir = "%s/keys" % userDirectory
-    # Make user directory
-    try:
-        os.mkdir(userDirectory)
-    except FileExistsError:
-        print("Username in use")
-        print(sys.exc_info[0])
+    # Attempt to register with system
+    registered = serverconnect.register(user, pwd, userPublicKey)
 
-    # Create user info
-    userInfo = {
-        "username": user,
-        "password": pwd
-    }
-    # Save user info
-    infoDir = "%s/userInfo.json" % userDirectory
-    f = open(infoDir, "w")
-    json.dump(userInfo, f)
-    f.close()
-    
-    try:
-        os.mkdir(keysDir)
-    except FileExistsError:
-        # Don't make the directory
-        pass
+    # If successful registration, save user information to local system
+    if registered:
+        # Create keys directory
+        ### FOR TESTING ###
+        userDirectory = "%s/local_users/%s" % (os.getcwd(), user)
+        keysDir = "%s/keys" % userDirectory
+        # Make user directory
+        try:
+            os.mkdir(userDirectory)
+        except FileExistsError:
+            print("Username in use")
+            print(sys.exc_info())
 
-    # Write private key
-    prvPem = userPrivateKey.private_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PrivateFormat.TraditionalOpenSSL,
-        encryption_algorithm=serialization.NoEncryption()
-    )
-    privateDirectory = "%s/privateKey.pem" % keysDir
-    f = open(privateDirectory, "wb")
-    f.write(prvPem)
-    f.close()
+        # Create user info
+        userInfo = {
+            "username": user,
+            "password": pwd
+        }
+        # Save user info
+        infoDir = "%s/userInfo.json" % userDirectory
+        f = open(infoDir, "w")
+        json.dump(userInfo, f)
+        f.close()
+        
+        try:
+            os.mkdir(keysDir)
+        except FileExistsError:
+            # Don't make the directory
+            pass
 
-    ### FOR TESTING ONLY -- someday just send the public key to the database ###
-    # Write public key
-    pubPem = userPublicKey.public_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PublicFormat.SubjectPublicKeyInfo
-    )
-    publicDirectory = "%s/publicKey.pem" % userDirectory
-    f = open(publicDirectory, "wb")
-    f.write(pubPem)
-    f.close()
+        # Write private key
+        prvPem = userPrivateKey.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.TraditionalOpenSSL,
+            encryption_algorithm=serialization.NoEncryption()
+        )
+        privateDirectory = "%s/privateKey.pem" % keysDir
+        f = open(privateDirectory, "wb")
+        f.write(prvPem)
+        f.close()
 
-    print("Your private key has been saved. DO NOT LOSE THIS KEY. If you lose your private key you must re-register with the system and lose any messages or files that have been sent to you.")
-    print("Your registration is successful! You may now login.")
-    print("\n")
-
-    return False
+        print("Your private key has been saved. DO NOT LOSE THIS KEY. If you lose your private key you must re-register with the system and lose any messages or files that have been sent to you.")
+        print("Your registration is successful!")
+        print("\n")
+        return User(userInfo["username"])
+    else:
+        print("Failed to register with the system. Please try again.")
+        return False
 
 def __admin() -> bool:
     """This is only for testing, it MUST be deleted after deployment"""

@@ -9,8 +9,9 @@ import json
 
 class User:
     def __init__(self, username):
+        self.USERS = "%s/local_users" % os.getcwd()
         # Load user info
-        with open(("test_files/%s/userInfo.json" % username), "r") as f:
+        with open(("%s/%s/userInfo.json" % (self.USERS, username)), "r") as f:
             self.user = json.load(f)
             f.close()
 
@@ -162,7 +163,7 @@ class User:
 
         # Load private rsa key
         with open("%s/test_files/%s/keys/privateKey.pem" % (os.getcwd(), self.user["username"]), "rb") as f:
-            rsa = serialization.load_pem_private_key(f.read(), password=None)
+            rsa = serialization.load_pem_private_key(f.read(), backend=default_backend(), password=None)
             f.close()
 
         # Decrypt file key
@@ -198,8 +199,8 @@ class User:
 
     
     def __encryptRSA(self, user, file):
-        with open("%s/test_files/%s/publicKey.pem" % (os.getcwd(), user), "rb") as f:
-            rsa = serialization.load_pem_public_key(f.read())
+        with open("%s/%s/publicKey.pem" % (self.USERS, user), "rb") as f:
+            rsa = serialization.load_pem_public_key(f.read(), backend=default_backend())
             f.close()
 
         # Encrypt key
