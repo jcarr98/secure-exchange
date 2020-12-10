@@ -1,8 +1,9 @@
-# External imports
+# Python imports
 import sys
 import os
+
 # Custom imports
-from welcome import welcome
+import welcome
 from user import User
 
 def clear():
@@ -12,6 +13,49 @@ def clear():
     # Mac/linux
     else:
         _ = os.system('clear')
+
+def login():
+    user = None
+    while user is None:
+        # Print welcome message
+        welcome.print_welcome()
+
+        # Wait for user feedback
+        cmd = input("Please login (l), register (r), or quit (q) to continue. For help type 'help': ")
+
+        # Parse user input
+        parsedCmd = cmd.split(" ")
+
+        # Check for keywords 'register' or 'login' and execute accordingly
+        if parsedCmd[0] == "help":
+            # Print help
+            welcome.print_help()
+        elif parsedCmd[0] == "register" or parsedCmd[0] == "r":
+            # Check if correct command
+            if len(parsedCmd) > 3:
+                print("Too many inputs! There should only be 3 words.")
+            else:
+                # Attempt to register user with system
+                user, message = welcome.register(parsedCmd[1], parsedCmd[2])
+        elif parsedCmd[0] == "login" or parsedCmd[0] == "l":
+            if len(parsedCmd) > 3:
+                print("Too many inputs! There should only be 3 words.")
+            else:
+                # Attempt to log user in
+                user, message = welcome.login(parsedCmd[1], parsedCmd[2])
+        elif parsedCmd[0] == "quit" or parsedCmd[0] == "q":
+            # Quit program
+            print("Goodbye!")
+            sys.exit()
+        else:
+            user, message = None, "Invalid command, try again."
+        
+        clear()
+        print(message)
+        print("\n")
+    
+    return user
+
 
 def runClient(user):
     # Clear screen
@@ -94,11 +138,7 @@ def runClient(user):
 
 if __name__ == "__main__":
     # Show login screen
-    success = False
-    while not success:
-        #clear()
-        success = welcome()
-        print(success)
+    user = login()
 
     # Successful login
-    runClient(success)
+    runClient(user)
