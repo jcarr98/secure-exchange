@@ -3,7 +3,8 @@ import sys
 import os
 
 # Custom imports
-import welcome
+import src.welcome as welcome
+import src.ext.serverconnect as server
 
 def clear():
     # Windows
@@ -81,68 +82,70 @@ def runClient(user):
         cmd = input("Enter an option number: ")
 
         choices = {
-            "1": send,
-            "2": refresh,
-            "3": list_messages,
-            "4": list_messages,
-            "5": quit
+            "1": __send,
+            "2": __refresh,
+            "3": __list_messages,
+            "4": __list_messages,
+            "5": __quit
         }
 
+        # Get action user chooses
         action = choices.get(cmd, lambda: "Invalid input. Please enter the number only.")
 
+        # Perform action
         action()
 
-def send(user):
+def __send(user):
+    # Get recipient to send user to, make sure it is at least one character
     while True:
-        recipient = input("Who would you like to send the file to? ")
-        # Check recipient exists - BACKEND FUNCTION
-        path = "%s/test_files" % os.getcwd()
-        allFiles = os.listdir(path)
-        exists = False
-        for i in allFiles:
-            if os.path.isdir("%s/%s" % (path, i)) and i == recipient:
-                    exists = True
-                    break
-        if exists:
-            break
+        recipient = input("Who would you like to send the file to?\n")
+        if len(recipient.strip(" ")) == 0:
+            print("Please enter a valid recipient.")
         else:
-            print("Please pick a valid recipient")
+            break
+
+    # Get type of data
     while True:
-        fileType = input("Would you like to send a message or a file? m/f: ")
+        fileType = input("Would you like to send a message or a file? (m/f)\n")
         print(fileType)
         if fileType != "m" and fileType != "f":
-            print("Please pick a valid option.")
+            print("Please pick either m or f.")
         else:
             break
 
+    # Deal with message
     if fileType == "m":
+        # Get subject of message
         while True:
-            subject = input("What is the subject of your message? ")
+            subject = input("What is the subject of your message?\n")
             if len(subject.strip(" ")) == 0:
-                print("Please enter a valid subject")
+                print("Please enter a valid subject.")
             else:
                 break
-
+        
+        # Get user message
         print("What message would you like to send?")
         message = input()
+
+        # Send message
         user.send(recipient, subject, message, True)
     else:
         print("Work in progress")
 
-def refresh(user):
+def __refresh(user):
     user.receive()
 
-def list_messages(user):
+def __list_messages(user):
     messages = user.getMessages()
     if len(messages) == 0:
         print("No messages!")
     for i in range(0, len(messages)):
         print("%i. %s from %s" % (i+1, messages[i]["subject"], messages[i]["sender"]))
 
-def read_message(user):
+def __read_message(user):
     user.readMessage()
 
-def quit():
+def __quit():
     print("Goodbye!")
     sys.exit()
 

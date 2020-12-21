@@ -20,6 +20,7 @@ class User:
 
     def send(self, recipient, subject, file, message=False):
         if message:
+            # Put full message into data and add extension
             fullFile = file
             ext = "txt"
         else:
