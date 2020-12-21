@@ -1,7 +1,10 @@
+# Python imports
 import socket
 import hashlib
 import os
+import sys
 
+# Crypto imports
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import rsa
@@ -12,7 +15,62 @@ from cryptography.hazmat.primitives.asymmetric import padding
 SERVER_IP = "127.0.0.1"
 SERVER_PORT = 8008
 
-def register(user, pwd, key):
+USERS = "%s/local_users" % os.getcwd()
+
+def auth(user, pwd):
+    """Authenticate user to server
+    
+        Parameters:
+            user (str): username
+            pwd (str): password
+
+        Returns:
+            True if authenticated, False if bad auth
+    """
+    # Connect to server
+    sock = __connect()
+
+    # Handshake with server and get public key
+    serverKey = __handshake(sock)
+
+    # Error in packets
+    if serverKey == False:
+        return False, "Error communicating to server."
+
+    # Craft AUTH packet
+    msg = ("AUTH,%s,%s" % (user, pwd))
+
+    # Encrypt packet with server's RSA key
+    msgEnc = __encryptRSA(msg, serverKey)
+
+    # Send AUTH packet
+    sock.sendall(msgEnc)
+
+    # Receive AUTH response
+    resp = sock.recv(1024)
+
+    # Decrypt AUTH response
+    decResp = __decryptRSA(resp, user).decode('utf-8')
+
+    # Parse response
+    parsedResp = decResp.split(",")
+
+    if parsedResp[0] == "OK":
+        sessionKey = parsedResp[1].encode('utf-8')
+    else:
+        return False, "Bad username or password"
+
+    # Save session key for user
+    try:
+        with open("%s/%s/keys/session_key.key" % (USERS, user), "wb") as f:
+            f.write(sessionKey)
+            f.close()
+    except:
+        return False, "Error saving session key."
+
+    return True, "Successful login!"
+
+def reg(user, pwd, key):
     """Registers user with system
 
             Parameters:
@@ -42,7 +100,7 @@ def register(user, pwd, key):
     msg = ("REGISTER,%s,%s" % (user, pwd))
 
     # Encrypt with server's RSA key
-    msgEnc = __encrypt(msg, serverKey)
+    msgEnc = __encryptRSA(msg, serverKey)
 
     # Send REGISTER packet
     sock.sendall(msgEnc)
@@ -83,35 +141,6 @@ def register(user, pwd, key):
         return parsedResp[1] == "OK"
     except IndexError:
         return False
-
-def auth(user, pwd):
-    """Authenticate user to server
-    
-        Parameters:
-            user (str): username
-            pwd (str): password
-
-        Returns:
-            True if authenticated, False if bad auth
-    """
-    # Connect to server
-    sock = __connect()
-    serverKey = __handshake(sock)
-
-    if serverKey == False:
-        return False
-
-    # Craft AUTH packet
-    msg = ("AUTH,%s,%s" % (user, pwd))
-    print("Sending: %s" % msg)
-
-    msgEnc = __encrypt(msg, serverKey)
-
-    # Send AUTH packet
-    sock.sendall(msgEnc)
-
-    # Receive AUTH confirmation
-    resp = sock.recv(1024)
     
 def send():
     pass
@@ -156,7 +185,7 @@ def __handshake(sock):
     # Parse response
     parsedResp = resp.split(",")
 
-    # Check correcte response
+    # Check correct response
     if parsedResp[0] != "HELLO" and parsedResp[1] != "SecureServer":
         print("Bad response")
         return False
@@ -173,7 +202,9 @@ def __handshake(sock):
 def __clean_key(key):
     keyUpdated = False
 
+    # Convert key to bytes
     key = key.encode('utf-8')
+    print(key)
 
     # Hash new key
     new = hashlib.sha256()
@@ -183,12 +214,13 @@ def __clean_key(key):
     existing = hashlib.sha256()
     
     try:
-        with open("%s/serverInfo.pem" % os.getcwd(), "rb") as f:
+        with open("%s/serverKey.pem" % os.getcwd(), "rb") as f:
             existingBytes = f.read()
             f.close()
         
         existing.update(existingBytes)
 
+        # Compare hash of new key and old key to see if key has been updated
         keyUpdated = new.digest() != existing.digest()
     except FileNotFoundError:
         # No key found
@@ -196,21 +228,22 @@ def __clean_key(key):
 
     if keyUpdated:
         print("Updated key")
+
         # Save new key
-        with open("%s/serverInfo.pem" % os.getcwd(), "wb") as f:
+        with open("%s/serverKey.pem" % os.getcwd(), "wb") as f:
             f.write(key)
             f.close()
     else:
         print("Key not updated")
 
     # Load and return key
-    with open("%s/serverInfo.pem" % os.getcwd(), "rb") as f:
+    with open("%s/serverKey.pem" % os.getcwd(), "rb") as f:
         keyToReturn = serialization.load_pem_public_key(f.read(), backend=default_backend())
         f.close()
 
     return keyToReturn
 
-def __encrypt(msg, key):
+def __encryptRSA(msg, key):
     """Encrypts message with RSA key
 
             Parameters:
@@ -222,7 +255,6 @@ def __encrypt(msg, key):
     """
     # Convert message to bytes
     msg = msg.encode('utf-8')
-    print(msg.decode('utf-8'))
     return key.encrypt(
         msg,
         padding.OAEP(
@@ -230,4 +262,38 @@ def __encrypt(msg, key):
             algorithm=hashes.SHA256(),
             label=None
         )
+    )
+
+def __decryptRSA(msg, user):
+    """Decrypts message with RSA key
+
+            Parameters:
+                msg (str): message to be sent
+                user (str): user with key to use
+            
+            Returns:
+                Decrypted message
+    """
+    # Load user's private key
+    try:
+        with open("%s/%s/keys/privateKey.pem" % (USERS, user), "rb") as f:
+            privateKey = serialization.load_pem_private_key(
+                f.read(),
+                password=None,
+                backend=default_backend()
+            )
+            f.close()
+    except:
+        print("Error opening user's private key")
+        print(sys.exc_info())
+        return None
+    
+    # Decrypt message
+    return privateKey.decrypt(
+        msg, 
+        padding.OAEP(
+                mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                algorithm=hashes.SHA256(),
+                label=None
+            )
     )

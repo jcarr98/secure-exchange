@@ -1,11 +1,17 @@
+"""Interface for users to login or register"""
+
+# Python imports
+import os
+import json
+
+# Crypto imports
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
-import os
-import sys
-import json
+
+# Custom imports
 from user import User
-import serverconnect
+from serverconnect import auth, reg
 
 def print_welcome() -> None:
         """Print the welcome text to user"""
@@ -18,16 +24,13 @@ def print_welcome() -> None:
 
 def login(user, pwd) -> bool:
     """Allow users to login to the system"""
-    ### TESTING ###
-    infoDir = "%s/local_users/%s/userInfo.json" % (os.getcwd(), user)
-    f = open(infoDir, "r")
-    userInfo = json.load(f)
-    f.close()
+    print("Attempting to log you in...")
+    result, message = auth(user, pwd)
 
-    if userInfo["password"] == pwd:
-        return User(userInfo["username"]), "Successful login!"
+    if result:
+        return User(user), message
     else:
-        return None, "Bad username or password"
+        return None, message
 
 def register(user, pwd) -> bool:
     """Allow users to register with the system
@@ -53,7 +56,7 @@ def register(user, pwd) -> bool:
     print("Success! Public key created.")
 
     # Attempt to register with system
-    registered = serverconnect.register(user, pwd, userPublicKey)
+    registered = reg(user, pwd, userPublicKey)
 
     # If successful registration, save user information to local system
     if registered:

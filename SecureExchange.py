@@ -88,7 +88,7 @@ def runClient(user):
             "5": quit
         }
 
-        action = choices(cmd, lambda: "Invalid input. Please enter the number only.")
+        action = choices.get(cmd, lambda: "Invalid input. Please enter the number only.")
 
         action()
 
