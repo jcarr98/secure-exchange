@@ -1,299 +1,194 @@
 # Python imports
 import socket
-import hashlib
 import os
-import sys
 
-# Crypto imports
-from cryptography.hazmat.primitives import serialization
+# Cryptography imports
 from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
 
-# Methods for user to send information to server
-SERVER_IP = "127.0.0.1"
-SERVER_PORT = 8008
+# Custom imports
+from src.user import User
+from src.ext.packet import Packet
 
-USERS = "%s/local_users" % os.getcwd()
+class ServerConnect(object):
+    def __init__(self) -> None:
+        # Class variables
+        self.sock = None  # The socket connected to the server
+        self.user = None  # The user interacting with the server, None until authed
+        self.server_key = None  # The public RSA key of the server
 
-def auth(user, pwd):
-    """Authenticate user to server
     
-        Parameters:
-            user (str): username
-            pwd (str): password
-
-        Returns:
-            True if authenticated, False if bad auth
-    """
-    # Connect to server
-    sock = __connect()
-
-    # Handshake with server and get public key
-    serverKey = __handshake(sock)
-
-    # Error in packets
-    if serverKey == False:
-        return False, "Error communicating to server."
-
-    # Craft AUTH packet
-    msg = ("AUTH,%s,%s" % (user, pwd))
-
-    # Encrypt packet with server's RSA key
-    msgEnc = __encryptRSA(msg, serverKey)
-
-    # Send AUTH packet
-    sock.sendall(msgEnc)
-
-    # Receive AUTH response
-    resp = sock.recv(1024)
-
-    # Decrypt AUTH response
-    decResp = __decryptRSA(resp, user).decode('utf-8')
-
-    # Parse response
-    parsedResp = decResp.split(",")
-
-    if parsedResp[0] == "OK":
-        sessionKey = parsedResp[1].encode('utf-8')
-    else:
-        return False, "Bad username or password"
-
-    # Save session key for user
-    try:
-        with open("%s/%s/keys/session_key.key" % (USERS, user), "wb") as f:
-            f.write(sessionKey)
-            f.close()
-    except:
-        return False, "Error saving session key."
-
-    return True, "Successful login!"
-
-def reg(user, pwd, key):
-    """Registers user with system
-
-            Parameters:
-                user (str): username
-                pwd (str): password
-                key (bytes): user's public RSA key
-
-            Returns:
-                True if successful, False if not
-    """
-
-    # Connect to server
-    sock = __connect()
-    serverKey = __handshake(sock)
-
-    # Check successful key response
-    if serverKey == False:
-        return False
-
-    # Convert user key to bytes
-    key = key.public_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PublicFormat.SubjectPublicKeyInfo
-    )
-
-    # Craft register message
-    msg = ("REGISTER,%s,%s" % (user, pwd))
-
-    # Encrypt with server's RSA key
-    msgEnc = __encryptRSA(msg, serverKey)
-
-    # Send REGISTER packet
-    sock.sendall(msgEnc)
-
-    # Receive confirmation, check for key request
-    resp = sock.recv(1024).decode('utf-8')
-
-    if resp == "REQ KEY":
-        # Key requested
-        msg = key
-
-        # Send key to server
-        print("Sending key")
-        sock.sendall(msg)
-    elif resp == "BAD USERNAME":
-        # Username in use
-        print("Username in use")
-        sock.close()
-        return False
-    else:
-        # Some other issue
-        print("Unknown error")
-        sock.close()
-        return False
+    def auth(self, name, pwd):
+        """Authenticate user to server
     
-    # Wait for DONE
-    try:
-        print("waiting for DONE")
-        resp = sock.recv(1024).decode('utf-8')
-        sock.close()
-    except ConnectionResetError:
-        resp = "Connection closed"
-        sock.close()
+                Parameters:
+                    user (str): username
+                    pwd (str): password
+
+                Returns:
+                    True if authenticated, False if bad auth
+        """
+        # Check user exists on system
+        if not os.path.isdir("{loc}/local_users/{name}".format(loc=os.getcwd(), name=name)):
+            print("Bad username or password")
+            return False
+
+        # Connect to server
+        print("initiating connection with {name}".format(name=name))
+        self.__initiate_connection("127.0.0.1", 8008, name)
+
+        # Create auth message
+        msg = "AUTH,{name},{password}".format(name=name, password=pwd)
+
+        # Encrypt message with server's RSA key
+        safeMsg = self.__encrypt_RSA(msg, self.server_key)
+
+        # Create packet
+        pack = Packet()
+        # Add encrypted data
+        pack.add_encrypted(safeMsg)
+
+        # Send packet to server
+        self.sock.sendall(pack.send())
+
+        # Receive AUTH packet
+        resp = self.__receive_packet()
+
+        # If successful, packet should be:
+        # OK, <session_key encrypted with user public key>
+        semiResp = resp.split(",".encode('utf-8'), 1)
+
+        if semiResp[0].decode('utf-8') != "OK":
+            print("Bad username or password")
+            return False
+
+        # Load user
+        self.user = User(name, "{loc}/local_users/{name}".format(loc=os.getcwd(), name=name))
+
+        # Decrypt rest of data, should be session key
+        sess = self.user.decryptRSA(semiResp[1])
+
+        # Add session key to user
+        self.user.save_session(sess)
+
+        # Successful auth
+        return True
+
     
-    parsedResp = resp.split(",")
+    def get_user(self):
+        return self.user
 
-    try:
-        return parsedResp[1] == "OK"
-    except IndexError:
-        return False
     
-def send():
-    pass
+    def __initiate_connection(self, ip, port,name=None):
+        # Create socket and connect to server
+        self.sock = self.__connect(ip, port)
 
-def receive():
-    pass
+        if name is None:
+            self.server_key = self.__handshake(self.user.get_name())
+        else:
+            self.server_key = self.__handshake(name)
 
-def __connect():
-    """Connects user to server
 
-        Returns:
-            connected socket
-    """
-    # Create socket
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    def __connect(self, ip, port):
+        """Connects user to server
 
-    # Connect socket to server
-    sock.connect((SERVER_IP, SERVER_PORT))
+                Parameters:
+                    ip (str): The IP of the server to connect to
+                    port (int): The port number to connect through
 
-    # Return connected socket
-    return sock
+                Returns:
+                    connected socket
+        """
+        # Create socket
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-def __handshake(sock):
-    """Performs initial handshake with server and gets server's RSA
+        # Connect socket to server
+        sock.connect((ip, port))
+
+        # Return connected socket
+        return sock
+
+
+    def __handshake(self, name):
+        """Performs initial handshake with server and gets server's RSA
     
             Parameters:
                 sock: socket connected to server
 
             Returns:
                 Server's public RSA key
-    """
-    # Craft HELLO packet
-    msg = "HELLO,SecureClient".encode('utf-8')
-    
-    # Send packet
-    sock.sendall(msg)
+        """
+        # Craft HELLO packet
+        # Format: HELLO,SecureClient,<USER_NAME>
+        pack = Packet("HELLO,SecureClient,{user}".format(user=name))
 
-    # Wait for server's key
-    resp = sock.recv(1024).decode('utf-8')
-    print(resp)
-    
-    # Parse response
-    parsedResp = resp.split(",")
+        print("Sending {pkt}".format(pkt=pack.send().decode('utf-8')))
+        # Send HELLO packet
+        self.sock.sendall(pack.send())
 
-    # Check correct response
-    if parsedResp[0] != "HELLO" and parsedResp[1] != "SecureServer":
-        print("Bad response")
-        return False
+        # Wait for server's response, should be server's key
+        resp = self.__receive_packet()
 
-    try:
-        # Extract the key from server message
-        dirtyKey = parsedResp[2]
-    except IndexError:
-        print("Bad key message")
-        return False
+        # Since this shouldn't be encrypted, we can turn it directly into a packet to manipulate
+        pack = Packet(resp)
 
-    return __clean_key(dirtyKey)
+        # Format of server HELLO should be:
+        # HELLO,SecureServer,key
+        if pack.get_fields(0) != "HELLO" or pack.get_fields(1) != "SecureServer":
+            print("Bad handshake with server")
+            return False
 
-def __clean_key(key):
-    keyUpdated = False
-
-    # Convert key to bytes
-    key = key.encode('utf-8')
-    print(key)
-
-    # Hash new key
-    new = hashlib.sha256()
-    new.update(key)
-
-    # Hash old key
-    existing = hashlib.sha256()
-    
-    try:
-        with open("%s/serverKey.pem" % os.getcwd(), "rb") as f:
-            existingBytes = f.read()
-            f.close()
-        
-        existing.update(existingBytes)
-
-        # Compare hash of new key and old key to see if key has been updated
-        keyUpdated = new.digest() != existing.digest()
-    except FileNotFoundError:
-        # No key found
-        keyUpdated = True
-
-    if keyUpdated:
-        print("Updated key")
-
-        # Save new key
-        with open("%s/serverKey.pem" % os.getcwd(), "wb") as f:
-            f.write(key)
-            f.close()
-    else:
-        print("Key not updated")
-
-    # Load and return key
-    with open("%s/serverKey.pem" % os.getcwd(), "rb") as f:
-        keyToReturn = serialization.load_pem_public_key(f.read(), backend=default_backend())
-        f.close()
-
-    return keyToReturn
-
-def __encryptRSA(msg, key):
-    """Encrypts message with RSA key
-
-            Parameters:
-                msg (str): message to be sent
-                key (_RSAPublicKey): key to encrypt with
-            
-            Returns:
-                Encrypted message
-    """
-    # Convert message to bytes
-    msg = msg.encode('utf-8')
-    return key.encrypt(
-        msg,
-        padding.OAEP(
-            mgf=padding.MGF1(algorithm=hashes.SHA256()),
-            algorithm=hashes.SHA256(),
-            label=None
+        print("Suspected key: {key}".format(key=pack.get_fields(2)))
+        # Create key from string
+        key = serialization.load_pem_public_key(
+            pack.get_fields(2).encode('utf-8'),
+            backend=default_backend()
         )
-    )
 
-def __decryptRSA(msg, user):
-    """Decrypts message with RSA key
+        # Return server key
+        return key
 
-            Parameters:
-                msg (str): message to be sent
-                user (str): user with key to use
-            
-            Returns:
-                Decrypted message
-    """
-    # Load user's private key
-    try:
-        with open("%s/%s/keys/privateKey.pem" % (USERS, user), "rb") as f:
-            privateKey = serialization.load_pem_private_key(
-                f.read(),
-                password=None,
-                backend=default_backend()
-            )
-            f.close()
-    except:
-        print("Error opening user's private key")
-        print(sys.exc_info())
-        return None
     
-    # Decrypt message
-    return privateKey.decrypt(
-        msg, 
-        padding.OAEP(
+    def __receive_packet(self):
+        # Receive first chunk of packet
+        pkt = self.sock.recv(1024)
+
+        # Separate by comma, but can't decode encrypted data
+        separator = ",".encode('utf-8')
+
+        # Get length of packet
+        length = int(pkt.split(separator, 1)[0].decode('utf-8'))
+        
+        # Separate data, encode back into bytes to maintain size counter
+        data = pkt.split(separator, 1)[1]
+
+        # Get bytes left to collect
+        remaining = length - len(data)
+
+        # Keep collecting bytes until there are none left
+        while remaining > 0:
+            # Collect new data
+            newData = self.sock.recv(1024)
+            # Updated bytes remaining
+            remaining -= len(newData)
+            # Append onto already collected data
+            data += newData
+
+        return data
+
+
+    def __encrypt_RSA(self, file, key):
+        # Encrypt file
+        safeFile = key.encrypt(
+            file.encode('utf-8'),
+            padding.OAEP(
                 mgf=padding.MGF1(algorithm=hashes.SHA256()),
                 algorithm=hashes.SHA256(),
                 label=None
             )
-    )
+        )
+
+        return safeFile

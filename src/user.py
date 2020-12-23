@@ -1,21 +1,25 @@
+# Python imports
+import os
+import json
+
+# Cryptography imports
 from cryptography.fernet import Fernet
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
-import os
-import json
 
 class User:
-    def __init__(self, username):
-        self.USERS = "%s/local_users" % os.getcwd()
-        # Load user info
-        with open(("%s/%s/userInfo.json" % (self.USERS, username)), "r") as f:
-            self.user = json.load(f)
-            f.close()
+    def __init__(self, name, directory):
+        self.name = name
+        self.session = None
 
-        self.messages = []
+        # Check user exists
+        if not os.path.isdir(directory):
+            return None
+        else:
+            self.directory = directory
 
 
     def send(self, recipient, subject, file, message=False):
@@ -95,117 +99,50 @@ class User:
         print("Sent message %s" % file)
 
 
-    def receive(self):
-        print("Received 1 new message!")
-    
-
-    def getMessages(self):
-        # Load items from database
-        with open("%s/test_files/sent_files/combos.json" % os.getcwd(), "r") as f:
-            databaseInfo = json.load(f)
-            f.close()
-
-        messages = []
-
-        # Get all messages available to user
-        for i in databaseInfo:
-            if databaseInfo[i]["recipient"] == self.user["username"] and databaseInfo[i]["message"]:
-                messages.append(databaseInfo[i])
-
-        return messages
-
-    def getFiles(self):
-        # Get list of all items available to user
-        with open("%s/test_files/sent_files/combos.json" % os.getcwd(), "r") as f:
-            databaseInfo = json.load(f)
-            f.close()
-        
-        files = []
-        # Download all items from database
-        for i in databaseInfo:
-            if databaseInfo[i]["recipient"] == self.user["username"] and not databaseInfo[i]["message"]:
-                files.append(databaseInfo[i])
-
-        return files
-
-
-    def readMessage(self):
-        messages = self.getMessages()
-
-        if len(messages) == 0:
-            print("No messages to read")
-            return
-
-        # List out messages for user to pick
-        while True:
-            print("Pick a message to read")
-            for i in range(0, len(messages)):
-                print("%i. %s from %s" % (i+1, messages[i]["subject"], messages[i]["sender"]))
-
-            messageToRead = input("Please enter a message number: ")
-
-            try:
-                messageToRead = int(messageToRead) - 1
-            except ValueError:
-                print("Please enter a number.")
-                continue
-
-            if (messageToRead < 0) or (messageToRead >= len(messages)):
-                print("Please enter a valid message number.")
-            else:
-                break
-        
-        messageToRead = messages[messageToRead]
-
-        # Get file key
-        with open("%s/test_files/sent_files/%s" % (os.getcwd(), messageToRead["key"]), "rb") as f:
-            key = f.read()
-            f.close()
-
-        # Load private rsa key
-        with open("%s/test_files/%s/keys/privateKey.pem" % (os.getcwd(), self.user["username"]), "rb") as f:
-            rsa = serialization.load_pem_private_key(f.read(), backend=default_backend(), password=None)
-            f.close()
-
-        # Decrypt file key
-        key = rsa.decrypt(
-            key,
-            padding.OAEP(
-                mgf=padding.MGF1(algorithm=hashes.SHA256()),
-                algorithm=hashes.SHA256(),
-                label=None
-            )
-        )
-
-        # Get message
-        with open("%s/test_files/sent_files/%s" % (os.getcwd(), messageToRead["file"]), "rb") as f:
-            file = f.read()
-            f.close()
-
-        # Decrypt message
-        message = self.__decrypt(file, key).decode('utf-8')
-
-        print(message)
-        print("\n")
-        save = input("Would you like to save this message? y/n: ")
-        
-        if save == "y":
-            print("Not implemented yet...")
-        
-        print("\n\n")  # Add some spacing for readability
-
-
-    def viewFiles(self):
+    def list_possessions(self):
         pass
 
     
-    def __encryptRSA(self, user, file):
-        with open("%s/%s/publicKey.pem" % (self.USERS, user), "rb") as f:
-            rsa = serialization.load_pem_public_key(f.read(), backend=default_backend())
-            f.close()
+    def retrieve_file(self, file):
+        """Interact with the specified file"""
+        pass
 
-        # Encrypt key
-        return rsa.encrypt(
+    
+    def encryptRSA(self, file, key):
+        """Encrypt and sign a file using RSA public keys
+        
+                Parameters:
+                    file (bytes): the file to be encrypted
+                    key (RSAPublicKey): public key to encrypt files with
+
+                Returns:
+                    (file, signature) where file=encrypted file and signature=signature of file
+        """
+        # Load private key
+        try:
+            with open("%s/keys/privatekey.pem" % self.directory, "rb") as f:
+                private_key = serialization.load_pem_private_key(
+                    f.read(),
+                    password=None,
+                    backend=default_backend()
+                )
+        except:
+            # Someday, create custom exceptions
+            print("Error signing message")
+            return
+
+        # Sign file
+        signature = private_key.sign(
+            file,
+            padding.PSS(
+                mgf=padding.MGF1(hashes.SHA256()),
+                salt_length=padding.PSS.MAX_LENGTH
+            ),
+            hashes.SHA256()
+        )
+
+        # Encrypt file
+        safeFile = key.encrypt(
             file,
             padding.OAEP(
                 mgf=padding.MGF1(algorithm=hashes.SHA256()),
@@ -213,16 +150,35 @@ class User:
                 label=None
             )
         )
+
+        return (safeFile, signature)
+
+    
+    def get_name(self):
+        return self.name
+
+    
+    def save_session(self, key):
+        self.session = key
+
+    
+    def decryptRSA(self, file):
+        pass
         
 
-    def __encrypt(self, file, key):
-        encryptor = Fernet(key)
+    def __encrypt(self, file, key=None):
+        # Use session key if no key is provided
+        if key is None:
+            encryptor = Fernet(self.session)
+        else:
+            encryptor = Fernet(key)
 
         return encryptor.encrypt(file)
 
 
-    def __decrypt(self, file, key):
-        decryptor = Fernet(key)
+    def __decrypt(self, file, key=None):
+        # Use session key if no key is provided
+        decryptor = Fernet(self.session)
 
         return decryptor.decrypt(file)
 

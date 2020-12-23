@@ -10,8 +10,8 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 
 # Custom imports
-from user import User
-from serverconnect import auth, reg
+from src.user import User
+from src.ext.serverconnect import ServerConnect as Server
 
 def print_welcome() -> None:
         """Print the welcome text to user"""
@@ -25,12 +25,16 @@ def print_welcome() -> None:
 def login(user, pwd) -> bool:
     """Allow users to login to the system"""
     print("Attempting to log you in...")
-    result, message = auth(user, pwd)
+    # Create server
+    serv = Server()
 
-    if result:
-        return User(user), message
+    # Auth with server
+    connected = serv.auth(user, pwd)
+
+    if connected:
+        return serv.get_user()
     else:
-        return None, message
+        return None
 
 def register(user, pwd) -> bool:
     """Allow users to register with the system
