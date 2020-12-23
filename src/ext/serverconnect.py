@@ -141,7 +141,6 @@ class ServerConnect(object):
             print("Bad handshake with server")
             return False
 
-        print("Suspected key: {key}".format(key=pack.get_fields(2)))
         # Create key from string
         key = serialization.load_pem_public_key(
             pack.get_fields(2).encode('utf-8'),
