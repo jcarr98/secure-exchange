@@ -16,7 +16,7 @@ from src.ext.packet import Packet
 class ServerConnect(object):
     def __init__(self) -> None:
         # Class variables
-        self.sock = None  # The socket connected to the server
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # The socket connected to the server
         self.user = None  # The user interacting with the server, None until authed
         self.server_key = None  # The public RSA key of the server
 
@@ -57,6 +57,9 @@ class ServerConnect(object):
         # Receive AUTH packet
         resp = self.__receive_packet()
 
+        # Done communicating with server, close socket
+        self.sock.close()
+
         # If successful, packet should be:
         # OK, <session_key encrypted with user public key>
         semiResp = resp.split(",".encode('utf-8'), 1)
@@ -78,41 +81,90 @@ class ServerConnect(object):
         return True
 
     
+    def register(self, user, pwd, pKey):
+        # Connect to server
+        self.__initiate_connection("127.0.0.1", 8008)
+
+        # Create reg packet
+        msg = "REGISTER,{user},{pwd},{key}".format(user=user, pwd=pwd, key=pKey)
+
+        # Encrypt message with server's public key
+        safeMsg = self.__encrypt_RSA(msg, self.server_key)
+
+        # Craft reg packet
+        pack = Packet()
+        pack.add_encrypted(safeMsg)
+
+        # Send request packet
+        self.sock.sendall(pack.send())
+
+        # Read response
+        resp = self.__receive_packet()
+
+        # Done sending messages
+        self.sock.close()
+
+        # Shouldn't be encrypted, so load into packet
+        pack2 = Packet(resp)
+
+        # Check response
+        # Possibilties:
+        # DONE,OK - User successfully registered
+        # DONE,ERR - Error registering user with system
+        return pack2.get_fields(1) == "OK"
+
+    
+    def check_username(self, user):
+        # Connect to server
+        self.__initiate_connection("127.0.0.1", 8008)
+
+        # Create request message
+        msg = "USER,{req}".format(req=user)
+
+        # Encrypt this message with server's rsa key
+        safeMsg = self.__encrypt_RSA(msg, self.server_key)
+
+        # Craft request packet
+        pack = Packet()
+        pack.add_encrypted(safeMsg)
+
+        # Send request pack
+        self.sock.sendall(pack.send())
+
+        # Read response
+        resp = self.__receive_packet()
+
+        # Done sending messages
+        self.sock.close()
+
+        # Shouldn't be encrypted, so load into packet
+        pack = Packet(resp)
+        print(pack.get_fields())
+
+        # Check response
+        # Possibilities:
+        # USER,YES - User exists
+        # USER,NO - User does not exist
+        # USER,BAD - Error
+        if pack.get_fields(1) == "YES":
+            return True
+        elif pack.get_fields(1) == "NO":
+            return False
+        else:
+            raise("Error retrieving username information.")
+
+    
     def get_user(self):
         return self.user
 
     
-    def __initiate_connection(self, ip, port,name=None):
+    def __initiate_connection(self, ip, port):
         # Create socket and connect to server
-        self.sock = self.__connect(ip, port)
-
-        if name is None:
-            self.server_key = self.__handshake(self.user.get_name())
-        else:
-            self.server_key = self.__handshake(name)
+        self.sock.connect((ip, port))
+        self.server_key = self.__handshake()
 
 
-    def __connect(self, ip, port):
-        """Connects user to server
-
-                Parameters:
-                    ip (str): The IP of the server to connect to
-                    port (int): The port number to connect through
-
-                Returns:
-                    connected socket
-        """
-        # Create socket
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
-        # Connect socket to server
-        sock.connect((ip, port))
-
-        # Return connected socket
-        return sock
-
-
-    def __handshake(self, name):
+    def __handshake(self):
         """Performs initial handshake with server and gets server's RSA
     
             Parameters:
@@ -122,8 +174,8 @@ class ServerConnect(object):
                 Server's public RSA key
         """
         # Craft HELLO packet
-        # Format: HELLO,SecureClient,<USER_NAME>
-        pack = Packet("HELLO,SecureClient,{user}".format(user=name))
+        # Format: HELLO,SecureClient
+        pack = Packet("HELLO,SecureClient")
 
         print("Sending {pkt}".format(pkt=pack.send().decode('utf-8')))
         # Send HELLO packet

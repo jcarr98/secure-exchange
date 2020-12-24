@@ -43,8 +43,11 @@ class Packet:
             final = "{length}".format(length=length)
 
         # Add encrypted data to message
-        final = "{full},".format(full=final).encode('utf-8')  # Add , to separate encrypted data into its own field
-        final += self.enc
+        if len(self.enc) > 0:
+            final = "{full},".format(full=final).encode('utf-8')  # Add , to separate encrypted data into its own field
+            final += self.enc
+        else:
+            final = final.encode('utf-8')
 
         # Return final bytes
         return final
