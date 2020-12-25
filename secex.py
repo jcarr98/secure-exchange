@@ -5,7 +5,7 @@ import time
 import threading
 
 # Custom imports
-import src.ext.serverconnect as serverconnect
+import src.ext.serverconnect as Server
 
 class Exchange(object):
     def __init__(self, user) -> None:
