@@ -12,7 +12,6 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 # Custom imports
 from secex import Exchange
 from src.ext.serverconnect import ServerConnect as Server
-import src.welcome as welcome
 
 def clear():
     """Clears terminal window"""
@@ -26,17 +25,14 @@ def clear():
 
 
 def user_exists(directory):
-    # Get username
-    with open("{dir}/user_info.json".format(dir=directory), "r") as f:
-        info = json.loads(f.read())
-        f.close()
-
-    username = info["username"]
-
-    print("Hello {user}! Please login to continue. Type 'quit' to quit.".format(user=username))
+    print("Hello! Please login to continue. Type 'quit' to quit.")
     # Login stuff
-    pwd = input("Password: ")
+    username = input("Username: ")
+    if username.lower() == "quit":
+        print("Goodbye!")
+        sys.exit()
 
+    pwd = input("Password: ")
     if pwd.lower() == "quit":
         print("Goodbye!")
         sys.exit()

@@ -177,7 +177,6 @@ class ServerConnect(object):
         # Format: HELLO,SecureClient
         pack = Packet("HELLO,SecureClient")
 
-        print("Sending {pkt}".format(pkt=pack.send().decode('utf-8')))
         # Send HELLO packet
         self.sock.sendall(pack.send())
 
