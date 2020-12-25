@@ -5,7 +5,6 @@ import time
 import threading
 
 # Custom imports
-import src.welcome as welcome
 import src.ext.serverconnect as serverconnect
 
 class Exchange(object):
