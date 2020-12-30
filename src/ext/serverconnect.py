@@ -41,13 +41,13 @@ class ServerConnect(object):
         self.__initiate_connection("127.0.0.1", 8008, name)
 
         # Create auth message
-        msg = "AUTH,{name},{password}".format(name=name, password=pwd)
+        msg = "{name},{password}".format(name=name, password=pwd)
 
         # Encrypt message with server's RSA key
         safeMsg = self.__encrypt_RSA(msg, self.server_key)
 
         # Create packet
-        pack = Packet()
+        pack = Packet("AUTH")
         # Add encrypted data
         pack.add_encrypted(safeMsg)
 
@@ -85,27 +85,29 @@ class ServerConnect(object):
         # Connect to server
         self.__initiate_connection("127.0.0.1", 8008)
 
-        # Create reg packet
-        msg = "REGISTER,{user},{pwd},{key}".format(user=user, pwd=pwd, key=pKey)
+        # Create registration message
+        msg = "{user},{pwd}".format(user=user, pwd=pwd)
 
         # Encrypt message with server's public key
         safeMsg = self.__encrypt_RSA(msg, self.server_key)
 
-        # Craft reg packet
-        pack = Packet()
+        # Craft registration packet
+        # Format: <public key>,<username>,<password>
+        pack = Packet("REGISTER")
+        pack.add_encrypted(pKey)
         pack.add_encrypted(safeMsg)
 
         # Send request packet
         self.sock.sendall(pack.send())
 
         # Read response
-        resp = self.__receive_packet()
+        respCat, resp = self.__receive_packet()
 
         # Done sending messages
         self.sock.close()
 
         # Shouldn't be encrypted, so load into packet
-        pack2 = Packet(resp)
+        pack2 = Packet("REGISTER", resp)
 
         # Check response
         # Possibilties:
@@ -114,41 +116,78 @@ class ServerConnect(object):
         return pack2.get_fields(1) == "OK"
 
     
+    def login(self, username, password):
+        # Connect to the server
+        self.__initiate_connection("127.0.0.1", 8008)
+
+        # Send the server a login request
+        msg = "{user},{pwd}".format(user=username, pwd=password)
+
+        # Encrypt message
+        safeMsg = self.__encrypt_RSA(msg, self.server_key)
+
+        # Craft packet
+        lPack = Packet("AUTH")
+        lPack.add_encrypted(safeMsg)
+
+        # Send login packet
+        self.sock.sendall(lPack.send())
+
+        # Wait for response
+        lResp = self.__receive_packet()
+
+        # Response format should be:
+        # DONE,SUCC,<token (fernet)>,<key (rsa)>
+        # DONE,ERR
+        
+        # Separate all fields
+        respParsed = lResp.split(",".encode('utf-8'))
+
+        # Check for success
+        if respParsed[1] == "ERR":
+            print("Login error")
+            return False
+        
+        # Create user
+        user = User(username, "{loc}/existing_user/{user}".format(loc=os.getcwd(), user=username))
+
+        # Get key
+        key = user.decryptRSA(respParsed[3])
+
+        user.save_session(key)
+
+    
     def check_username(self, user):
         # Connect to server
         self.__initiate_connection("127.0.0.1", 8008)
 
-        # Create request message
-        msg = "USER,{req}".format(req=user)
-
-        # Encrypt this message with server's rsa key
-        safeMsg = self.__encrypt_RSA(msg, self.server_key)
+        # Encrypt message with server's rsa key
+        safeMsg = self.__encrypt_RSA(user, self.server_key)
 
         # Craft request packet
-        pack = Packet()
+        pack = Packet("USER")
         pack.add_encrypted(safeMsg)
 
         # Send request pack
         self.sock.sendall(pack.send())
 
         # Read response
-        resp = self.__receive_packet()
+        respHeader, resp = self.__receive_packet()
 
         # Done sending messages
         self.sock.close()
 
         # Shouldn't be encrypted, so load into packet
-        pack = Packet(resp)
-        print(pack.get_fields())
+        pack = Packet(respHeader, resp)
 
         # Check response
         # Possibilities:
-        # USER,YES - User exists
-        # USER,NO - User does not exist
-        # USER,BAD - Error
-        if pack.get_fields(1) == "YES":
+        # YES - User exists
+        # NO - User does not exist
+        # BAD - Error
+        if pack.get_fields(0) == "YES":
             return True
-        elif pack.get_fields(1) == "NO":
+        elif pack.get_fields(0) == "NO":
             return False
         else:
             raise("Error retrieving username information.")
@@ -175,16 +214,16 @@ class ServerConnect(object):
         """
         # Craft HELLO packet
         # Format: HELLO,SecureClient
-        pack = Packet("HELLO,SecureClient")
+        pack = Packet("HANDSHAKE", "HELLO,SecureClient")
 
         # Send HELLO packet
         self.sock.sendall(pack.send())
 
         # Wait for server's response, should be server's key
-        resp = self.__receive_packet()
+        header, resp = self.__receive_packet()
 
         # Since this shouldn't be encrypted, we can turn it directly into a packet to manipulate
-        pack = Packet(resp)
+        pack = Packet("HANDSHAKE", resp)
 
         # Format of server HELLO should be:
         # HELLO,SecureServer,key
@@ -209,11 +248,28 @@ class ServerConnect(object):
         # Separate by comma, but can't decode encrypted data
         separator = ",".encode('utf-8')
 
-        # Get length of packet
-        length = int(pkt.split(separator, 1)[0].decode('utf-8'))
+        # Get length of header
+        headerLength = int(pkt.split(separator, 1)[0].decode('utf-8'))
+
+        try:
+            # Get entire header, should not be more than 1024 bytes
+            header = pkt[0:headerLength]
+
+            # Header should be in format header_length, data_length, packet_type
+            header = header.decode('utf-8')
+        except:
+            print("Header error")
+            return None
+
+        # Get length of data
+        length = int(header.split(",")[1])
         
         # Separate data, encode back into bytes to maintain size counter
-        data = pkt.split(separator, 1)[1]
+        try:
+            data = pkt[headerLength+1:]
+        except IndexError:
+            # If header was exactly 1024 (should never happen)
+            data = bytes(0)
 
         # Get bytes left to collect
         remaining = length - len(data)
@@ -227,11 +283,13 @@ class ServerConnect(object):
             # Append onto already collected data
             data += newData
 
-        return data
+        return header, data
 
 
     def __encrypt_RSA(self, file, key):
         # Encrypt file
+        print(key)
+        print(file)
         safeFile = key.encrypt(
             file.encode('utf-8'),
             padding.OAEP(

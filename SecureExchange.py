@@ -37,6 +37,12 @@ def user_exists(directory):
         print("Goodbye!")
         sys.exit()
 
+    # Create server connector
+    serv = Server()
+
+    # Try logging in
+    success = serv.login(username, pwd)
+
     return None
 
 
@@ -135,7 +141,7 @@ def register(user, pwd):
     serv = Server()
 
     # Attempt to register user with server
-    registered = serv.register(user, pwd, userPublicKey)
+    registered = serv.register(user, pwd, userPublicKey.public_bytes(encoding=serialization.Encoding.PEM, format=serialization.PublicFormat.SubjectPublicKeyInfo))
 
     # If successful registration, save user information to local system
     if registered:
