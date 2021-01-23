@@ -135,6 +135,7 @@ class ServerConnect(object):
 
         # Wait for response
         lResp = self.__receive_packet()
+        print(lResp)
 
         # Response format should be:
         # DONE,SUCC,<token (fernet)>,<key (rsa)>
@@ -155,6 +156,8 @@ class ServerConnect(object):
         key = user.decryptRSA(respParsed[3])
 
         user.save_session(key)
+
+        return user
 
     
     def check_username(self, user):

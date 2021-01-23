@@ -43,7 +43,10 @@ def user_exists(directory):
     # Try logging in
     success = serv.login(username, pwd)
 
-    return None
+    if success is not False:
+        return success
+    else:
+        return None
 
 
 def new_user():
@@ -83,7 +86,7 @@ def new_user():
         if taken:
             badUsername = True
             clear()
-            print("Sorry, username is taken, please try another.")
+            print("Sorry, that username is taken, please try another.")
 
     # Get password
     clear()
@@ -103,7 +106,7 @@ def new_user():
         if pwd.lower() == "cancel":
             clear()
             return False
-        if len(pwd) > 1024 or len(pwd) < 10:
+        if len(pwd) > 2048 or len(pwd) < 10:
             badPassword = True
         if "," in pwd:
             badPassword = True
